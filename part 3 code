@@ -1,0 +1,125 @@
+using System.Text;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+
+namespace WpfRecipeManger
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        private List<Recipe> recipes = new List<Recipe>();
+        private List<Recipe> filteredRecipes = new List<Recipe>();
+        public MainWindow()
+        {
+            InitializeComponent();
+            InitializeFoodGroups();
+        }
+        private void InitializeFoodGroups()
+        {
+            // Add food groups to the ComboBox 
+            cmbFoodGroupFilter.Items.Add("All");
+            cmbFoodGroupFilter.Items.Add("Vegetable");
+            cmbFoodGroupFilter.Items.Add("Fruit");
+            cmbFoodGroupFilter.Items.Add("Grain");
+            cmbFoodGroupFilter.Items.Add("Protein");
+            cmbFoodGroupFilter.Items.Add("Dairy");
+            cmbFoodGroupFilter.SelectedIndex = 0; 
+        }
+        private void FilterRecipes(object sender, EventArgs e)
+        {
+            string ingredientFilter = txtIngredientFilter.Text.ToLower();
+            string selectedFoodGroup = cmbFoodGroupFilter.SelectedItem?.ToString();
+            bool isCaloriesValid = double.TryParse(txtCaloriesFilter.Text, out double maxCalories);
+
+            filteredRecipes = recipes.Where(recipe =>
+                (string.IsNullOrWhiteSpace(ingredientFilter) || recipe.Ingredients.Any(ing => ing.Name.ToLower().Contains(ingredientFilter))) &&
+                (selectedFoodGroup == "All" || string.IsNullOrWhiteSpace(selectedFoodGroup) || recipe.Ingredients.Any(ing => ing.FoodGroup == selectedFoodGroup)) &&
+                (!isCaloriesValid || recipe.Ingredients.Sum(ing => ing.Calories) <= maxCalories)
+            ).ToList();
+
+            lstRecipes.ItemsSource = filteredRecipes.Select(r => r.Name).ToList();
+        }
+       
+
+       
+
+        private void BtnNewRecipe_Click(object sender, RoutedEventArgs e)
+        {
+            var newRecipeWindow = new NewRecipeWindow();
+            if (newRecipeWindow.ShowDialog() == true)
+            {
+                recipes.Add(newRecipeWindow.NewRecipe);
+                FilterRecipes(null, null);
+                MessageBox.Show("Recipe added successfully!");
+            }
+        }
+        private void BtnScaleRecipe_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRecipes.SelectedItem is Recipe selectedRecipe)
+            {
+                InputDialog inputDialog = new InputDialog("Enter the scaling factor (e.g., 0.5 for half, 2 for double):");
+                if (inputDialog.ShowDialog() == true && double.TryParse(inputDialog.Answer, out double scaleFactor))
+                {
+                    Recipe scaledRecipe = ScaleRecipe(selectedRecipe, scaleFactor);
+                    RecipeDetailWindow detailWindow = new RecipeDetailWindow(scaledRecipe);
+                    detailWindow.Show();
+                }
+            }
+        }
+        private Recipe ScaleRecipe(Recipe recipe, double scaleFactor)
+        {
+            var scaledIngredients = recipe.Ingredients.Select(ing => new Ingredient(
+                ing.Name,
+                ing.Quantity * scaleFactor,
+                ing.Unit,
+                ing.Calories * scaleFactor,
+                ing.FoodGroup
+            )).ToList();
+
+            return new Recipe(recipe.Name, scaledIngredients, recipe.Steps);
+        }
+
+        private void BtnViewRecipe_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRecipes.SelectedItem is Recipe selectedRecipe)
+            {
+                RecipeDetailWindow detailWindow = new RecipeDetailWindow(selectedRecipe);
+                detailWindow.Show();
+            }
+        }
+
+        private void BtnSelectRecipe_Click(object sender, RoutedEventArgs e)
+        {
+            if (lstRecipes.SelectedItem == null)
+            {
+                MessageBox.Show("Please select a recipe.");
+                return;
+            }
+
+            var selectedRecipeName = lstRecipes.SelectedItem.ToString();
+            var selectedRecipe = recipes.FirstOrDefault(r => r.Name == selectedRecipeName);
+
+            if (selectedRecipe == null)
+            {
+                MessageBox.Show("Recipe not found.");
+                return;
+            }
+
+            var recipeDetailWindow = new RecipeDetailWindow(selectedRecipe);
+            recipeDetailWindow.Show();
+        }
+        private void LstRecipes_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Handle recipe selection change if needed
+        }
+    }
+}
